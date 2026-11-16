@@ -42,7 +42,7 @@ apenas mediar vendas, mas otimizar o tempo e o lucro de quem faz o transporte.
 [Diagrama de Sequência](https://github.com/Pimbosss/Projeto-Flash-Foods/blob/main/Projeto/DiagramaDeSequencia/diagramadeSequencia.md)   
 [Diagrama de Estado](https://github.com/Pimbosss/Projeto-Flash-Foods/blob/main/Projeto/DiagramaDeEstado/diagramaDeEstado.md)  
 [História de Usuário](https://github.com/Pimbosss/Projeto-Flash-Foods/blob/main/Projeto/Hist%C3%B3riaDeUsu%C3%A1rio/Hist%C3%B3ria%20de%20usu%C3%A1rio.md)  
-[Tabela de dados](Projeto/TabelaDeDados/tabela-de-dados.md)
+[Tabela de dados](Projeto/TabelaDeDados/tabela-de-dados.md) 
 [Banco de dados](https://github.com/Pimbosss/Flash-Foods/tree/main/Projeto/Banco%20de%20Dados)
 
 #
