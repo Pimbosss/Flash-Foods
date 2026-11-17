@@ -1,18 +1,21 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { api } from '@/services/api';
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/services/firebase";
 
 export interface DadosLoja {
     id: string;
     nome: string;
     endereco: string;
+    categoria?: string;
+    cnpj?: string;
     usuarioId: string;
     produtos: any[];
 }
 
 export default function useAreaRestaurante() {
-    const [abaAtiva, setAbaAtiva] = useState<"visao-geral" | "produtos" | "pedidos" | "perfil" >("visao-geral");
+    const [abaAtiva, setAbaAtiva] = useState<"visao-geral" | "produtos" | "pedidos" | "perfil">("visao-geral");
     const [dados, setDados] = useState<DadosLoja>({ id: "", nome: "", endereco: "", usuarioId: "", produtos: [] });
     const [pedidos, setPedidos] = useState([]);
 
@@ -33,23 +36,45 @@ export default function useAreaRestaurante() {
                 return;
             }
 
-            api.get(`/restaurantes?usuarioId=${usuarioLogado.id}`)
-                .then(resLoja => {
-                    if (resLoja.data && resLoja.data.length > 0) {
-                        const lojaDoBanco = resLoja.data[0];
+            // 🔍 Busca a loja no Firestore onde usuarioId == usuarioLogado.id
+            async function carregarLoja() {
+                try {
+                    const q = query(
+                        collection(db, "restaurantes"),
+                        where("usuarioId", "==", usuarioLogado.id)
+                    );
+                    const querySnapshot = await getDocs(q);
+
+                    if (!querySnapshot.empty) {
+                        const docLoja = querySnapshot.docs[0];
+                        const lojaDoBanco = docLoja.data();
 
                         setDados({
-                            id: lojaDoBanco.id,
-                            nome: lojaDoBanco.nome,
-                            endereco: lojaDoBanco.endereco,
-                            usuarioId: lojaDoBanco.usuarioId,
+                            id: docLoja.id,
+                            nome: lojaDoBanco.nome || "",
+                            endereco: lojaDoBanco.endereco || "",
+                            categoria: lojaDoBanco.categoria || "",
+                            cnpj: lojaDoBanco.cnpj || "",
+                            usuarioId: lojaDoBanco.usuarioId || "",
                             produtos: lojaDoBanco.produtos || []
                         });
+                        const qPedidos = query(
+                            collection(db, "pedidos"),
+                            where("restauranteId", "==", docLoja.id)
+                        );
+                        const snapPedidos = await getDocs(qPedidos);
+                        const listaPedidosLoja = snapPedidos.docs.map(d => ({
+                            id: d.id,
+                            ...d.data()
+                        }));
+                        setPedidos(listaPedidosLoja as any);
                     }
-                })
-                .catch(err => {
-                    console.error("Erro ao sincronizar dados comerciais:", err);
-                });
+                } catch (err) {
+                    console.error("Erro ao sincronizar dados comerciais no Firestore:", err);
+                }
+            }
+
+            carregarLoja();
         }
     }, []);
 

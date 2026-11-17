@@ -35,7 +35,8 @@ export default function Perfil() {
                 <div className={styles.infoGroup}>
                     <div className={styles.infoField}>
                         <span className={styles.label}>E-mail</span>
-                        <input 
+                        <input
+                            readOnly 
                             type="text" 
                             name="email" 
                             value={userData.email} 

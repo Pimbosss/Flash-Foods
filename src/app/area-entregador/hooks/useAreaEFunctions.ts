@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from "react";
-import { api } from "@/services/api";
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 
 export interface PedidoReal {
     id: string;
@@ -16,10 +17,10 @@ export interface PedidoReal {
     subtotal: number;
     taxaEntrega: number;
     total: number;
-    status: "pendente" | "preparando" | "a caminho" | "concluido"; //  ADICIONADO: status "preparando" no contrato
+    status: "pendente" | "preparando" | "a caminho" | "concluido";
     data: string;
     restaurante?: string;
-    restauranteId?: string; //  Vinculo relacional
+    restauranteId?: string;
     endereco?: string;
     enderecoRestaurante?: string;
     distancia?: string;
@@ -47,41 +48,44 @@ export default function useAreaEFunctions() {
 
     const diferencaOntem = ganhosHoje - ganhosOntem;
 
-    const carregarCorridasDisponiveis = () => {
-        api.get("/pedidos")
-            .then((resp) => {
-                const listaGeral = resp.data || [];
+    // 📥 Busca os pedidos diretamente da coleção "pedidos" no Firestore
+    const carregarCorridasDisponiveis = async () => {
+        try {
+            const querySnapshot = await getDocs(collection(db, "pedidos"));
+            const listaGeral = querySnapshot.docs.map(documento => ({
+                id: documento.id,
+                ...documento.data()
+            }));
 
-                // 🟢 Localize e ajuste INTEGRALMENTE o bloco da pedidosAdaptados dentro do seu useAreaEFunctions.ts:
-                const pedidosAdaptados = listaGeral.map((p: any) => {
-                    const kmCalculado = p.distancia
-                        ? Number(p.distancia.replace(" km", "").replace(",", "."))
-                        : Number((Math.random() * 4.3 + 1.2).toFixed(1));
+            const pedidosAdaptados = listaGeral.map((p: any) => {
+                const kmCalculado = p.distancia
+                    ? Number(p.distancia.replace(" km", "").replace(",", "."))
+                    : Number((Math.random() * 4.3 + 1.2).toFixed(1));
 
-                    const ganhoCorrida = 6.00 + (kmCalculado * 3.00);
-                    const valorDinamic = `R$ ${ganhoCorrida.toFixed(2).replace(".", ",")}`;
+                const ganhoCorrida = 6.00 + (kmCalculado * 3.00);
+                const valorDinamic = `R$ ${ganhoCorrida.toFixed(2).replace(".", ",")}`;
 
-                    return {
-                        ...p, // Espelha tudo o que já veio do db.json
-                        status: p.status, //  LINHA DE OURO: Garante que o status original ("pendente", "preparando") passe para o filtro!
-                        restaurante: p.restaurante || (p.itens?.[0]?.nome ? `Restaurante ${p.itens[0].nome.split(' ')[0]}` : "Flash Foods Store"),
-                        endereco: p.endereco || "Rua das Flores, 123 (Simulado)",
-                        enderecoRestaurante: "Av. Paulista, 900 (Simulado)",
-                        distancia: p.distancia || `${kmCalculado.toFixed(1).replace(".", ",")} km`,
-                        tempo: p.tempo || `${Math.floor(kmCalculado * 5)} min`,
-                        valor: p.valor || valorDinamic
-                    };
-                });
+                return {
+                    ...p,
+                    status: p.status,
+                    restaurante: p.restaurante || (p.itens?.[0]?.nome ? `Restaurante ${p.itens[0].nome.split(' ')[0]}` : "Flash Foods Store"),
+                    endereco: p.endereco || "Rua das Flores, 123 (Simulado)",
+                    enderecoRestaurante: p.enderecoRestaurante || "Av. Paulista, 900 (Simulado)",
+                    distancia: p.distancia || `${kmCalculado.toFixed(1).replace(".", ",")} km`,
+                    tempo: p.tempo || `${Math.floor(kmCalculado * 5)} min`,
+                    valor: p.valor || valorDinamic
+                };
+            });
 
+            // Filtra apenas pedidos que a cozinha já aceitou ("preparando") ou que estão "a caminho"
+            const corridasFiltradas = pedidosAdaptados.filter((p: any) =>
+                p.status === "preparando" || p.status === "a caminho"
+            );
 
-                // 🟢 FILTRO DE OURO: O entregador enxerga a corrida APENAS se a cozinha estiver "preparando" ou se o lanche já estiver "a caminho"!
-                const corridasFiltradas = pedidosAdaptados.filter((p: any) =>
-                    p.status === "preparando" || p.status === "a caminho"
-                );
-
-                setPedidosBanco(corridasFiltradas);
-            })
-            .catch((err) => console.error("Erro ao puxar pedidos:", err));
+            setPedidosBanco(corridasFiltradas);
+        } catch (err) {
+            console.error("Erro ao puxar pedidos do Firestore:", err);
+        }
     };
 
     useEffect(() => {
@@ -140,52 +144,60 @@ export default function useAreaEFunctions() {
         return `${String(horas).padStart(2, "0")}:${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
     }
 
-    // 🟢 CONECTADO OPERACIONALMENTE: Força o status a travar como "a caminho" sinalizando que a moto aceitou o frete!
-    function aceitarEntrega(entrega: PedidoReal) {
+    // 🟢 Atualiza o status para "a caminho" diretamente no documento do Firestore
+    async function aceitarEntrega(entrega: PedidoReal) {
         if (!online || entregaAtual) return;
 
-        const pacoteAtualizado = {
-            ...entrega,
-            status: "a caminho" as const // Mantém fixado que o motoca está se deslocando
-        };
-
-        api.put(`/pedidos/${entrega.id}`, pacoteAtualizado)
-            .then(() => {
-                setEntregaAtual(pacoteAtualizado);
-                setGpsVisivel(true);
-                alert("Corrida aceita com sucesso! Dirija-se ao estabelecimento para coletar o lanche. 🏍️💨");
-            })
-            .catch((err) => {
-                console.error("Erro Axios ao aceitar corrida:", err);
-                alert("Erro ao aceitar corrida no servidor.");
+        try {
+            const pedidoRef = doc(db, "pedidos", entrega.id);
+            await updateDoc(pedidoRef, {
+                status: "a caminho",
+                valor: entrega.valor,
+                distancia: entrega.distancia,
+                tempo: entrega.tempo
             });
+
+            const pacoteAtualizado = {
+                ...entrega,
+                status: "a caminho" as const
+            };
+
+            setEntregaAtual(pacoteAtualizado);
+            setGpsVisivel(true);
+            alert("Corrida aceita com sucesso! Dirija-se ao estabelecimento para coletar o lanche. 🏍️💨");
+        } catch (err) {
+            console.error("Erro ao aceitar corrida no Firestore:", err);
+            alert("Erro ao aceitar corrida no servidor.");
+        }
     }
 
-    function finalizarEntrega() {
+    // 🟢 Conclui a entrega no Firestore e soma o ganho na carteira do dia
+    async function finalizarEntrega() {
         if (!entregaAtual) return;
 
-        const pacoteFinalizado = {
-            ...entregaAtual,
-            status: "concluido" as const // Fecha a ordem de compra como entregue de vez!
-        };
+        try {
+            const pedidoRef = doc(db, "pedidos", entregaAtual.id);
+            await updateDoc(pedidoRef, {
+                status: "concluido"
+            });
 
-        api.put(`/pedidos/${entregaAtual.id}`, pacoteFinalizado)
-            .then(() => {
-                const valorEntrega = Number(
-                    (entregaAtual.valor || "R\$ 15,50")
-                        .replace("R\$", "")
-                        .replace(".", "")
-                        .replace(",", ".")
-                        .trim()
-                );
+            const valorEntrega = Number(
+                (entregaAtual.valor || "R$ 15,50")
+                    .replace("R$", "")
+                    .replace(".", "")
+                    .replace(",", ".")
+                    .trim()
+            );
 
-                setGanhosHoje(prev => prev + valorEntrega);
-                setEntregasTotais(prev => prev + 1);
-                setEntregaAtual(null);
-                setGpsVisivel(false);
-                alert("Entrega concluída com sucesso! Dinheiro na conta. 🎉💰");
-            })
-            .catch((err) => alert("Erro ao finalizar entrega no servidor."));
+            setGanhosHoje(prev => prev + valorEntrega);
+            setEntregasTotais(prev => prev + 1);
+            setEntregaAtual(null);
+            setGpsVisivel(false);
+            alert("Entrega concluída com sucesso! Dinheiro na conta. 🎉💰");
+        } catch (err) {
+            console.error("Erro ao finalizar entrega no Firestore:", err);
+            alert("Erro ao finalizar entrega no servidor.");
+        }
     }
 
     return {

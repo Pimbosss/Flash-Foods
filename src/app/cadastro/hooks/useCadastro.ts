@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebase";
 import Usuario from "@/core/Usuarios";
 
 const initialState: Usuario = {
@@ -23,11 +26,16 @@ export default function useCadastro() {
         setUser({ ...user, [name]: value });
     };
 
-    const save = (event: React.SubmitEvent<HTMLFormElement>) => {
+    const save = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (!user.email || !user.cpf || !user.phone || !user.password || !user.confirmPassword || !user.name) {
             alert("Todos os campos são obrigatórios! 📝");
+            return;
+        }
+
+        if (user.password.length < 6) {
+            alert("A senha deve ter pelo menos 6 caracteres! 🔐");
             return;
         }
 
@@ -36,37 +44,37 @@ export default function useCadastro() {
             return;
         }
 
-        // 📦 1. Lê o "banco de dados" local do navegador
-        const bancoLocal = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios: Usuario[] = bancoLocal ? JSON.parse(bancoLocal) : [];
+        try {
+            const emailLimpo = user.email.toLowerCase().trim();
 
-        // 🔍 2. Verifica duplicidade de e-mail
-        const emailLimpo = user.email.toLowerCase().trim();
-        const emailExiste = listaUsuarios.some(u => u.email.toLowerCase() === emailLimpo);
+            // 1. Cria a conta no Firebase Authentication (já bloqueia e-mail duplicado automaticamente)
+            const userCredential = await createUserWithEmailAndPassword(auth, emailLimpo, user.password);
+            const uid = userCredential.user.uid;
 
-        if (emailExiste) {
-            alert("Este e-mail já está cadastrado no sistema! ⚠️");
-            return;
+            // 2. Salva os dados complementares no banco Firestore (sem salvar a senha em texto puro)
+            await setDoc(doc(db, "users", uid), {
+                id: uid,
+                email: emailLimpo,
+                name: user.name,
+                cpf: user.cpf,
+                phone: user.phone,
+                tipo: "cliente"
+            });
+
+            alert("Cadastro realizado com sucesso na nuvem! 🎉");
+            setUser(initialState);
+            router.push("/login");
+
+        } catch (error: any) {
+            console.error("Erro ao cadastrar no Firebase:", error);
+            if (error.code === "auth/email-already-in-use") {
+                alert("Este e-mail já está cadastrado no sistema! ⚠️");
+            } else if (error.code === "auth/invalid-email") {
+                alert("Digite um formato de e-mail válido! ⚠️");
+            } else {
+                alert("Erro ao realizar o cadastro. Tente novamente.");
+            }
         }
-
-        // 🆔 3. Monta o novo usuário gerando um ID único
-        const novoUsuario: Usuario = {
-            id: String(Date.now()),
-            email: emailLimpo,
-            name: user.name,
-            cpf: user.cpf,
-            phone: user.phone,
-            password: user.password,
-            tipo: "cliente"
-        };
-
-        // 💾 4. Salva a lista atualizada no localStorage
-        listaUsuarios.push(novoUsuario);
-        localStorage.setItem("flashfoods:users_db", JSON.stringify(listaUsuarios));
-
-        alert("Cadastro realizado com sucesso! Bem-vindo ao Flash Foods. 🎉");
-        setUser(initialState);
-        router.push("/login");
     };
 
     return {

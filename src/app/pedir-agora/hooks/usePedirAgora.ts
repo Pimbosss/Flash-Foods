@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import { useCarrinho } from "@/context/CarrinhoContext";
-import { api } from '@/services/api';
 
 export interface RestauranteBanco {
     id: string;
@@ -20,16 +21,26 @@ export default function usePedirAgora() {
     const [restaurantes, setRestaurantes] = useState<RestauranteBanco[]>([]);
     const [restauranteSelecionado, setRestauranteSelecionado] = useState<RestauranteBanco | null>(null);
 
+    // 📥 Carrega os estabelecimentos da coleção "restaurantes" do Firestore
     useEffect(() => {
-        api.get("/restaurantes")
-            .then((resp) => {
-                setRestaurantes(resp.data || []);
-            })
-            .catch((err) => {
-                console.error("Erro ao carregar restaurantes do json-server:", err);
-            });
+        async function carregarRestaurantes() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "restaurantes"));
+                const listaLojas: RestauranteBanco[] = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as RestauranteBanco));
+
+                setRestaurantes(listaLojas);
+            } catch (err) {
+                console.error("Erro ao carregar restaurantes do Firestore:", err);
+            }
+        }
+
+        carregarRestaurantes();
     }, []);
 
+    // 🟢 1. FILTRO DE RESTAURANTES COM SUPORTE A SINÔNIMOS
     const restaurantesFiltrados = restaurantes.filter((restaurante) => {
         const correspondeBusca = restaurante.nome.toLowerCase().includes(busca.toLowerCase());
         if (!correspondeBusca) return false;
@@ -69,6 +80,7 @@ export default function usePedirAgora() {
         return vendeItemDaCategoria;
     });
 
+    // 🍕 2. FILTRO DE PRATOS UNIVERSAL
     const pratosDoCardapio = (() => {
         let listaBrutaPratos: any[] = [];
 
@@ -96,7 +108,7 @@ export default function usePedirAgora() {
                 const tipoPratoLimpo = prato.tipo ? prato.tipo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase() : "";
                 const filtroBotaoLimpo = categoria.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 
-                let bateuFiltro = tipoPratoLimpo.includes(filtroBotaoLimpo) || filtroBotaoLimpo.includes(filtroBotaoLimpo);
+                let bateuFiltro = tipoPratoLimpo.includes(filtroBotaoLimpo) || filtroBotaoLimpo.includes(tipoPratoLimpo);
 
                 if (filtroBotaoLimpo.includes("hamb") && (tipoPratoLimpo.includes("lanche") || tipoPratoLimpo.includes("hamb"))) {
                     bateuFiltro = true;

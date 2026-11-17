@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, collection, addDoc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebase";
 import Usuario from "@/core/Usuarios";
 
 export interface CadastroRestauranteForm extends Usuario {
@@ -32,11 +35,16 @@ export default function useCadastroRestaurante() {
         setRestaurante(prev => ({ ...prev, [name]: value }));
     };
 
-    const save = (e: React.SubmitEvent<HTMLFormElement>) => {
+    const save = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!restaurante.email || !restaurante.name || !restaurante.password || !restaurante.cnpj || !restaurante.nomeRestaurante) {
             alert("Por favor, preencha todos os campos obrigatórios! 📝");
+            return;
+        }
+
+        if (restaurante.password.length < 6) {
+            alert("A senha deve ter pelo menos 6 caracteres! 🔐");
             return;
         }
 
@@ -45,48 +53,51 @@ export default function useCadastroRestaurante() {
             return;
         }
 
-        const bancoUsuarios = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios: Usuario[] = bancoUsuarios ? JSON.parse(bancoUsuarios) : [];
+        try {
+            const emailLimpo = restaurante.email.toLowerCase().trim();
 
-        const emailLimpo = restaurante.email.toLowerCase().trim();
-        if (listaUsuarios.some(u => u.email.toLowerCase() === emailLimpo)) {
-            alert("Este e-mail comercial já está cadastrado no Flash Foods! Use outro e-mail. ⚠️");
-            return;
+            // 1. Cria a conta no Firebase Authentication
+            const userCredential = await createUserWithEmailAndPassword(auth, emailLimpo, restaurante.password);
+            const uid = userCredential.user.uid;
+
+            // 2. Cria a loja na coleção "restaurantes" do Firestore
+            const lojaRef = await addDoc(collection(db, "restaurantes"), {
+                nome: restaurante.nomeRestaurante,
+                cnpj: restaurante.cnpj,
+                categoria: restaurante.categoria,
+                endereco: "Endereço não informado",
+                usuarioId: uid,
+                produtos: []
+            });
+
+            // 3. Salva o perfil do proprietário na coleção "users" amarrado ao ID da loja
+            await setDoc(doc(db, "users", uid), {
+                id: uid,
+                name: restaurante.name,
+                email: emailLimpo,
+                phone: restaurante.phone,
+                cpf: restaurante.cpf,
+                tipo: "restaurante",
+                restauranteId: lojaRef.id
+            });
+
+            // Atualiza a loja incluindo o próprio ID dentro do documento para facilitar buscas futuras
+            await updateDoc(doc(db, "restaurantes", lojaRef.id), {
+                id: lojaRef.id
+            });
+
+            alert("Restaurante cadastrado com sucesso na nuvem! 🏪✨");
+            setRestaurante({ ...formInitialState });
+            router.push("/login");
+
+        } catch (error: any) {
+            console.error("Erro ao cadastrar restaurante:", error);
+            if (error.code === "auth/email-already-in-use") {
+                alert("Este e-mail comercial já está cadastrado no Flash Foods! ⚠️");
+            } else {
+                alert("Erro de comunicação com o Firebase ao tentar cadastrar.");
+            }
         }
-
-        const idUsuario = `user_${Date.now()}`;
-        const idLoja = `rest_${Date.now()}`;
-
-        // 1. Cria a loja na gaveta local de restaurantes
-        const bancoLojas = localStorage.getItem("flashfoods:restaurantes_db");
-        const listaLojas = bancoLojas ? JSON.parse(bancoLojas) : [];
-
-        listaLojas.push({
-            id: idLoja,
-            nome: restaurante.nomeRestaurante,
-            cnpj: restaurante.cnpj,
-            categoria: restaurante.categoria,
-            usuarioId: idUsuario,
-            produtos: []
-        });
-        localStorage.setItem("flashfoods:restaurantes_db", JSON.stringify(listaLojas));
-
-        // 2. Cria o usuário dono amarrado ao ID da loja
-        listaUsuarios.push({
-            id: idUsuario,
-            name: restaurante.name,
-            email: emailLimpo,
-            phone: restaurante.phone,
-            cpf: restaurante.cpf,
-            password: restaurante.password,
-            tipo: "restaurante",
-            restauranteId: idLoja
-        });
-        localStorage.setItem("flashfoods:users_db", JSON.stringify(listaUsuarios));
-
-        alert("Restaurante cadastrado com sucesso! 🏪✨");
-        setRestaurante({ ...formInitialState });
-        router.push("/login");
     };
 
     return {

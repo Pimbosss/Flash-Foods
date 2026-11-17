@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { api } from "@/services/api"; 
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import styles from "../restaurante.module.css"; 
 import { IoIosArrowDown, IoIosArrowUp } from "react-icons/io";
 
@@ -13,13 +14,23 @@ export default function Pedidos({ dadosLoja }: PedidosProps) {
     const [pedidos, setPedidos] = useState<any[]>([]);
     const [cardExpandido, setCardExpandido] = useState<string | null>(null);
 
-    const carregarPedidosDaCozinha = () => {
+    const carregarPedidosDaCozinha = async () => {
         if (dadosLoja && dadosLoja.id) {
-            api.get(`/pedidos?restauranteId=${dadosLoja.id}`)
-                .then((resp) => {
-                    setPedidos((resp.data || []).reverse());
-                })
-                .catch((err) => console.error("Erro ao carregar a esteira de pedidos:", err));
+            try {
+                const q = query(
+                    collection(db, "pedidos"),
+                    where("restauranteId", "==", dadosLoja.id)
+                );
+                const querySnapshot = await getDocs(q);
+                const listaPedidos = querySnapshot.docs.map(documento => ({
+                    id: documento.id,
+                    ...documento.data()
+                }));
+
+                setPedidos(listaPedidos.reverse());
+            } catch (err) {
+                console.error("Erro ao carregar a esteira de pedidos no Firestore:", err);
+            }
         }
     };
 
@@ -42,18 +53,18 @@ export default function Pedidos({ dadosLoja }: PedidosProps) {
             return; 
         }
 
-        const confirmar = window.confirm(`Deseja alterar o status do pedido #${pedido.id} para "${novoStatus.toUpperCase()}"? 🚚`);
+        const confirmar = window.confirm(`Deseja alterar o status do pedido #${pedido.id.slice(0, 8)} para "${novoStatus.toUpperCase()}"? 🚚`);
         if (!confirmar) return;
 
         try {
-            await api.put(`/pedidos/${pedido.id}`, {
-                ...pedido,
+            const pedidoRef = doc(db, "pedidos", pedido.id);
+            await updateDoc(pedidoRef, {
                 status: novoStatus
             });
             carregarPedidosDaCozinha();
         } catch (error) {
-            console.error("Erro ao avançar status da ordem de compra:", error);
-            alert("Erro de comunicação com o servidor ao atualizar status.");
+            console.error("Erro ao avançar status da ordem de compra no Firestore:", error);
+            alert("Erro de comunicação com o servidor na nuvem ao atualizar status.");
         }
     };
 
@@ -96,14 +107,14 @@ export default function Pedidos({ dadosLoja }: PedidosProps) {
                             key={pedido.id} 
                             onClick={() => avancarStatusPedido(pedido)}
                             title="Clique para avançar o status deste pedido na esteira"
-                            style={{ height: expandido ? "auto" : "85px" }} // Unida apenas a propriedade dinâmica controlada pelo React State
+                            style={{ height: expandido ? "auto" : "85px" }}
                         >
                             <button type="button" className={styles.btnInvisivel}>
-                                <h1>#{pedido.id} . {pedido.usuarioNome || "Cliente Flash Foods"}</h1>
+                                <h1>#{pedido.id.slice(0, 8)} . {pedido.usuarioNome || "Cliente Flash Foods"}</h1>
                                 <p className={expandido ? "" : styles.textoItens}>
                                     {itensTexto}
                                 </p>
-                                <p>R\$ {precoTotal.toFixed(2).replace(".", ",")}</p>
+                                <p>R$ {precoTotal.toFixed(2).replace(".", ",")}</p>
                                 
                                 {/* Seta para Expandir */}
                                 <div className={styles.setaExpandir} onClick={(e) => alternarExpansao(pedido.id, e)}>

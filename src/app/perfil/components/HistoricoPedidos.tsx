@@ -1,6 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react'
-import { api } from '@/services/api'
+
+import { useState, useEffect } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/services/firebase';
 import { FiClock, FiCheckCircle, FiShoppingBag } from "react-icons/fi";
 
 interface Pedido {
@@ -11,7 +13,7 @@ interface Pedido {
         id: string;
         nome: string;
         quantidade: number;
-        precoUnitario: number;
+        precoUnitario?: number;
     }>;
     subtotal: number;
     taxaEntrega: number;
@@ -21,38 +23,51 @@ interface Pedido {
     valor?: string;
 }
 
-
 export default function HistoricoPedido() {
-    const [pedidos, setPedidos] = useState<Pedido[]>([])
-    const [carregando, setCarregando] = useState(true)
-    const [tipoUsuario, setTipoUsuario] = useState<string>('cliente')
+    const [pedidos, setPedidos] = useState<Pedido[]>([]);
+    const [carregando, setCarregando] = useState(true);
+    const [tipoUsuario, setTipoUsuario] = useState<string>('cliente');
 
     useEffect(() => {
-        const sessao = localStorage.getItem('flashfoods:user')
+        const sessao = localStorage.getItem('flashfoods:user');
         if (!sessao) {
-            setCarregando(false)
-            return
+            setCarregando(false);
+            return;
         }
 
-        const usuarioLogado = JSON.parse(sessao)
-        const role = usuarioLogado.tipo || 'cliente'
-        setTipoUsuario(role)
+        const usuarioLogado = JSON.parse(sessao);
+        const role = usuarioLogado.tipo || 'cliente';
+        setTipoUsuario(role);
 
-        api.get('/pedidos')
-            .then(resp => {
-                const todosOsPedidos = resp.data
+        async function carregarHistorico() {
+            try {
+                const pedidosRef = collection(db, 'pedidos');
+                let q;
 
                 if (role === "entregador") {
-                    // O entregador vê as corridas que ele mesmo finalizou na área do entregador
-                    setPedidos(todosOsPedidos.filter((p: any) => p.status === "concluido"));
+                    // Busca as corridas concluídas no Firestore
+                    q = query(pedidosRef, where("status", "==", "concluido"));
                 } else {
-                    // O cliente comum vê apenas as compras feitas pelo ID dele
-                    setPedidos(todosOsPedidos.filter((p: any) => p.usuarioId === usuarioLogado.id));
+                    // Busca apenas os pedidos realizados pelo cliente logado
+                    q = query(pedidosRef, where("usuarioId", "==", usuarioLogado.id));
                 }
-            })
-            .catch((err) => console.error("Erro ao carregar historico", err))
-            .finally(() => setCarregando(false))
-    }, [])
+
+                const querySnapshot = await getDocs(q);
+                const listaPedidos: Pedido[] = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as Pedido));
+
+                setPedidos(listaPedidos);
+            } catch (err) {
+                console.error("Erro ao carregar histórico no Firestore:", err);
+            } finally {
+                setCarregando(false);
+            }
+        }
+
+        carregarHistorico();
+    }, []);
 
     if (carregando) {
         return <p style={{ color: "#64748b", fontSize: "14px" }}>Carregando histórico de pedidos...</p>;
@@ -81,7 +96,9 @@ export default function HistoricoPedido() {
                             {/* Cabeçalho do Card de Histórico */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                                 <div>
-                                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>Pedido #{pedido.id}</span>
+                                    <span style={{ fontSize: "14px", fontWeight: "700", color: "#0f172a" }}>
+                                        Pedido #{pedido.id.slice(0, 8)}
+                                    </span>
                                     <span style={{ fontSize: "12px", color: "#64748b", marginLeft: "12px" }}>{pedido.data}</span>
                                 </div>
                                 <span style={{
@@ -110,10 +127,8 @@ export default function HistoricoPedido() {
                                 </span>
                                 <strong style={{ fontSize: "16px", color: "#10b981" }}>
                                     R$ {tipoUsuario === "entregador"
-                                        ? // 🏍️ Para o entregador, exibe o valor calculado da corrida (ou a taxa de segurança)
-                                        (pedido.valor ? pedido.valor.replace("R$", "").trim() : "15,50")
-                                        : // 🍔 Para o cliente, exibe o total da compra (comida + taxa)
-                                        pedido.total.toFixed(2).replace(".", ",")}
+                                        ? (pedido.valor ? pedido.valor.replace("R$", "").trim() : "15,50")
+                                        : Number(pedido.total || 0).toFixed(2).replace(".", ",")}
                                 </strong>
                             </div>
 
@@ -122,5 +137,5 @@ export default function HistoricoPedido() {
                 </div>
             )}
         </div>
-    )
+    );
 }

@@ -18,7 +18,7 @@ interface VisaoGeralProps {
 export default function VisaoGeral({ dadosLoja, pedidos }: VisaoGeralProps) {
     
     // 🧮 CÁLCULOS EM TEMPO REAL BASEADOS NO BANCO DO SEU GRUPO:
-    const pedidosHoje = pedidos.filter((p: any) => p.status === "concluido" || p.status === "pendente" || p.status === "a caminho");
+    const pedidosHoje = pedidos.filter((p: any) => p.status === "concluido" || p.status === "pendente" || p.status === "preparando" || p.status === "a caminho");
     
     const receitaHoje = pedidosHoje
         .filter((p: any) => p.status === "concluido")
@@ -39,9 +39,9 @@ export default function VisaoGeral({ dadosLoja, pedidos }: VisaoGeralProps) {
                 <p>Receita Hoje</p>
                 <MdAttachMoney className={styles.cardIcon} />
                 <p className={styles.ganhos}>
-                    R\$ {receitaHoje > 0 ? receitaHoje.toFixed(2).replace(".", ",") : "0,00"}
+                    R$ {receitaHoje > 0 ? receitaHoje.toFixed(2).replace(".", ",") : "0,00"}
                 </p>
-                <p>+ R\$ 0,00 vs ontem</p>
+                <p>+ R$ 0,00 vs ontem</p>
             </div>
 
             <div className={styles.card2}>
@@ -64,9 +64,9 @@ export default function VisaoGeral({ dadosLoja, pedidos }: VisaoGeralProps) {
                 <p>Ticket Médio</p>
                 <IoIosTrendingUp className={styles.cardIcon} />
                 <p className={styles.ticket}>
-                    R\$ {pedidosHoje.length > 0 ? (receitaHoje / pedidosHoje.length).toFixed(2).replace(".", ",") : "0,00"}
+                    R$ {pedidosHoje.length > 0 ? (receitaHoje / pedidosHoje.length).toFixed(2).replace(".", ",") : "0,00"}
                 </p>
-                <p>+R\$ 0 esta semana</p>
+                <p>+R$ 0 esta semana</p>
             </div>
 
             {/* 🗂️ GRADE DE PRODUTOS E HISTÓRICO RECENTE CONECTADO */}
@@ -113,9 +113,9 @@ export default function VisaoGeral({ dadosLoja, pedidos }: VisaoGeralProps) {
                                 }
 
                                 return (
-                                    <li key={pedido.id}>
+                                    <li key={pedido.id.slice(0, 8)}>
                                         <div>
-                                            <h2># {pedido.id} · {pedido.usuarioNome || "Cliente Flash"}</h2>
+                                            <h2># {pedido.id.slice(0, 8)} · {pedido.usuarioNome || "Cliente Flash"}</h2>
                                             <p>
                                                 {pedido.itens?.map((item: any) => `${item.quantidade}x ${item.nome}`).join(", ") || "Itens do Pedido"}
                                             </p>

@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import { GoPencil } from "react-icons/go";
 import { FaRegTrashAlt } from "react-icons/fa";
-import { api } from "@/services/api";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import styles from "../restaurante.module.css";
 
 interface ProdutosProps {
-    dadosLoja: any; // Recebe o id e dados da loja vindos da page.tsx mãe
+    dadosLoja: any;
 }
 
 export default function Produtos({ dadosLoja }: ProdutosProps) {
@@ -24,56 +25,51 @@ export default function Produtos({ dadosLoja }: ProdutosProps) {
 
     const categorias = ["Lanches", "Pizza", "Bebidas", "Sobremesas", "Salgados"];
 
-    // 📥 1. CARREGA OS PRODUTOS REAIS DIRETO DO DB.JSON DA LOJA LOGADA
-
+    // 📥 1. CARREGA OS PRODUTOS REAIS DIRETO DO FIRESTORE DA LOJA LOGADA
     useEffect(() => {
-        if (dadosLoja && dadosLoja.id) {
-            // 🔍 MUDANÇA SENIOR: Troca a rota rígida por filtro (?id=). Nunca mais dá 404!
-            api.get(`/restaurantes?id=${dadosLoja.id}`)
-                .then((resp) => {
-                    // Como vira uma lista, checa se a loja existe no banco
-                    if (resp.data && resp.data.length > 0) {
-                        setProdutos(resp.data[0].produtos || []);
+        async function carregarProdutos() {
+            if (dadosLoja && dadosLoja.id) {
+                try {
+                    const lojaRef = doc(db, "restaurantes", dadosLoja.id);
+                    const lojaSnap = await getDoc(lojaRef);
+
+                    if (lojaSnap.exists()) {
+                        setProdutos(lojaSnap.data().produtos || []);
                     } else {
-                        // Fallback protetivo: se a loja não existir fisicamente ainda no db.json, inicia em branco sem quebrar
                         setProdutos([]);
                     }
-                })
-                .catch((err) => {
-                    console.error("Erro ao buscar produtos do cardápio:", err);
-                    setProdutos([]); // Mantém o array seguro e limpo
-                });
+                } catch (err) {
+                    console.error("Erro ao buscar produtos do cardápio no Firestore:", err);
+                    setProdutos([]);
+                }
+            }
         }
+
+        carregarProdutos();
     }, [dadosLoja]);
 
+    // 🔄 2. SINCRONIZA A LISTA DE PRODUTOS COM O FIRESTORE
+    const sincronizarComServidor = async (novosProdutos: any[]) => {
+        try {
+            setProdutos(novosProdutos);
 
-const sincronizarComServidor = async (novosProdutos: any[]) => {
-    try {
-        // 1. Atualiza o estado da listagem visual local imediatamente
-        setProdutos(novosProdutos);
+            const idFisicoReal = dadosLoja?.id;
 
-        const idFisicoReal = dadosLoja?.id;
+            if (!idFisicoReal) {
+                console.warn("Aguardando carregamento da ID comercial do restaurante...");
+                return;
+            }
 
-        if (!idFisicoReal) {
-            console.warn("Aguardando carregamento da ID comercial do restaurante...");
-            return;
+            const lojaRef = doc(db, "restaurantes", idFisicoReal);
+            await updateDoc(lojaRef, {
+                produtos: novosProdutos
+            });
+            
+        } catch (error) {
+            console.error("Erro crítico na sincronização com o Firestore:", error);
+            alert("Erro de comunicação com o banco na nuvem ao tentar salvar o prato.");
         }
-
-        // 2. 🛡️ COLA DE SEGURANÇA: Junta tudo o que já existia na loja comercial 
-        // (incluindo o usuarioId do print!) e injeta o array de lanches atualizado!
-        const pacoteAtualizado = {
-            ...dadosLoja, // 🔥 Isso copia o usuarioId real do banco e impede que ele se perca no PUT!
-            produtos: novosProdutos 
-        };
-
-        // 3. 🔥 SALVAMENTO SEGURO NA ROTA RÍGIDA DO SERVIDOR
-        await api.put(`/restaurantes/${idFisicoReal}`, pacoteAtualizado);
-        
-    } catch (error) {
-        console.error("Erro crítico na sincronização Axios:", error);
-        alert("Erro de comunicação com o servidor simulado ao tentar salvar o prato.");
-    }
-};
+    };
 
     const abrirModal = () => {
         setProdutoEditando(null);
@@ -102,11 +98,10 @@ const sincronizarComServidor = async (novosProdutos: any[]) => {
         setProduto({ ...produto, [campo]: valor });
     };
 
-    const salvarProduto = (e: React.SubmitEvent) => {
+    const salvarProduto = (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (produtoEditando) {
-            // Modo Edição 
             const novosProdutos = produtos.map((item) => {
                 if (item.id === produtoEditando) {
                     return {
@@ -121,9 +116,8 @@ const sincronizarComServidor = async (novosProdutos: any[]) => {
             });
             sincronizarComServidor(novosProdutos);
         } else {
-            // Modo Criação de um novo prato 
             const novoProduto = {
-                id: String(Date.now()), // ID única string compatível 
+                id: String(Date.now()),
                 tipo: produto.tipo,
                 nome: produto.nome,
                 descricao: produto.descricao,
@@ -176,7 +170,7 @@ const sincronizarComServidor = async (novosProdutos: any[]) => {
                         {produtosCategoria.map((item) => (
                             <div className={`${styles.cardProduto} ${!item.ativo ? styles.produtoDesativado : ""}`} key={item.id}>
                                 <h1>{item.nome}</h1>
-                                <p>R\$ {item.preco}</p>
+                                <p>R$ {item.preco}</p>
                                 <p>{item.descricao}</p>
                                 <p>{item.vendidos} vendidos</p>
 

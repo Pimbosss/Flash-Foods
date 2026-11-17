@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { api } from "@/services/api"; // Instância unificada do Axios do seu grupo
-import styles from "../restaurante.module.css"; // Seus estilos modulares unificados
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
+import styles from "../restaurante.module.css";
 import { FaStore, FaRegFileAlt, FaMapMarkerAlt } from "react-icons/fa";
 
 interface PerfilProps {
-    dadosLoja: any; // Recebe os dados de identificação vindos da page.tsx mãe
+    dadosLoja: any;
 }
 
 export default function Perfil({ dadosLoja }: PerfilProps) {
     const [loading, setLoading] = useState(false);
     
-    // 📥 Estado local que controla os campos do formulário comercial
     const [formLoja, setFormLoja] = useState({
         nome: "",
         cnpj: "",
@@ -20,7 +20,6 @@ export default function Perfil({ dadosLoja }: PerfilProps) {
         endereco: ""
     });
 
-    // 🔄 Sincroniza os campos do formulário assim que os dados da mãe chegam do servidor
     useEffect(() => {
         if (dadosLoja) {
             setFormLoja({
@@ -37,7 +36,7 @@ export default function Perfil({ dadosLoja }: PerfilProps) {
         setFormLoja(prev => ({ ...prev, [name]: value }));
     };
 
-    // 📤 DISPARA A ATUALIZAÇÃO DOS DADOS COMERCIAIS DIRETO NA GAVETA /RESTAURANTES
+    // 📤 Atualiza os dados comerciais diretamente no documento da loja no Firestore
     const salvarAlteracoesComerciais = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -48,26 +47,22 @@ export default function Perfil({ dadosLoja }: PerfilProps) {
 
         setLoading(true);
         try {
-            // 🛡️ RECOLA DE SEGURANÇA: Copia tudo o que a loja já tinha (incluindo o usuarioId e o CARDÁPIO de produtos!)
-            // e injeta por cima apenas os dados novos digitados nos inputs!
-            const dadosAtualizados = {
-                ...dadosLoja, 
+            const lojaRef = doc(db, "restaurantes", dadosLoja.id);
+            
+            // O updateDoc atualiza apenas esses 4 campos, mantendo o usuarioId e os produtos intactos!
+            await updateDoc(lojaRef, {
                 nome: formLoja.nome,
                 cnpj: formLoja.cnpj,
                 categoria: formLoja.categoria,
                 endereco: formLoja.endereco
-            };
-
-            // Dá o PUT na rota física correspondente do seu json-server
-            await api.put(`/restaurantes/${dadosLoja.id}`, dadosAtualizados);
+            });
             
-            alert("Dados comerciais do estabelecimento atualizados com sucesso! 🏪✨");
+            alert("Dados comerciais do estabelecimento atualizados com sucesso na nuvem! 🏪✨");
             
-            // Força um recarregamento leve da página para atualizar o título global do topo na mesma hora
             window.location.reload();
         } catch (error) {
-            console.error("Erro ao atualizar o perfil comercial do restaurante:", error);
-            alert("Erro ao conectar com o servidor simulado ao tentar salvar.");
+            console.error("Erro ao atualizar o perfil comercial no Firestore:", error);
+            alert("Erro ao conectar com o servidor na nuvem ao tentar salvar.");
         } finally {
             setLoading(false);
         }
@@ -149,6 +144,7 @@ export default function Perfil({ dadosLoja }: PerfilProps) {
                         </div>
                     </div>
                 </div>
+
                 {/* BOTÃO SALVAR */}
                 <button type="submit" className={styles.btnSalvar} disabled={loading}>
                     {loading ? "Sincronizando..." : "Salvar Alterações do Perfil 💾"}

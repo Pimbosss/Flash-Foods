@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from "next/navigation";
+import { collection, addDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import { useCarrinho } from "@/context/CarrinhoContext";
-import { api } from "@/services/api";
 
 export default function useCarrinhoPage() {
     const router = useRouter();
@@ -15,6 +16,7 @@ export default function useCarrinhoPage() {
         valorTotal
     } = useCarrinho();
 
+    // 🔑 ENVIAR PEDIDO PARA O FIRESTORE
     async function lidarComFinalizarPedido() {
         const sessao = localStorage.getItem("flashfoods:user");
         
@@ -42,15 +44,15 @@ export default function useCarrinhoPage() {
         };
 
         try {
-            await api.post("/pedidos", novoPedido);
-            alert("Pedido finalizado com sucesso! 🍔🔥 Seu lanche começou a ser preparado.");
+            await addDoc(collection(db, "pedidos"), novoPedido);
+            alert("Pedido finalizado com sucesso na nuvem! 🍔🔥 Seu lanche começou a ser preparado.");
             
             carrinho.forEach(item => removerDoCarrinho(item.id));
             
             router.push("/");
         } catch (error) {
-            console.error("Erro ao enviar pedido para o servidor:", error);
-            alert("Ocorreu um erro ao conectar com o servidor simulado. Tente novamente.");
+            console.error("Erro ao enviar pedido para o Firestore:", error);
+            alert("Ocorreu um erro ao conectar com o servidor. Tente novamente.");
         }
     }
 

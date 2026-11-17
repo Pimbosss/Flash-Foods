@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 import Usuario from '@/core/Usuarios';
 
 export default function usePerfil() {
@@ -15,7 +17,7 @@ export default function usePerfil() {
         }
     };
 
-    // 🔒 Trava de segurança e leitura do banco local do navegador
+    // 🔒 Trava de segurança e busca dos dados reais no Firestore
     useEffect(() => {
         const session = localStorage.getItem("flashfoods:user");
 
@@ -26,47 +28,56 @@ export default function usePerfil() {
         }
 
         const loggedUser = JSON.parse(session);
-        const bancoLocal = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios: Usuario[] = bancoLocal ? JSON.parse(bancoLocal) : [];
 
-        const usuarioCompleto = listaUsuarios.find(u => String(u.id) === String(loggedUser.id));
+        async function carregarPerfil() {
+            try {
+                const userRef = doc(db, "users", loggedUser.id);
+                const userSnap = await getDoc(userRef);
 
-        if (usuarioCompleto) {
-            setUserData(usuarioCompleto);
-        } else {
-            // Fallback caso o usuário tenha sido logado antes de limpar o banco
-            setUserData(loggedUser);
+                if (userSnap.exists()) {
+                    setUserData(userSnap.data() as Usuario);
+                } else {
+                    setUserData(loggedUser);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar perfil do Firestore:", error);
+            }
         }
+
+        carregarPerfil();
     }, [router]);
 
-    // 💾 Salva as alterações diretamente no localStorage
-    const save = () => {
+    // 💾 Atualiza os dados editáveis (Nome, Telefone e CPF) diretamente no Firestore
+    const save = async () => {
         if (!userData || !userData.id) return;
 
-        const bancoLocal = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios: Usuario[] = bancoLocal ? JSON.parse(bancoLocal) : [];
+        try {
+            const userRef = doc(db, "users", userData.id);
+            await updateDoc(userRef, {
+                name: userData.name,
+                phone: userData.phone || "",
+                cpf: userData.cpf || ""
+            });
 
-        const listaAtualizada = listaUsuarios.map(u => 
-            String(u.id) === String(userData.id) ? userData : u
-        );
+            // Atualiza a sessão ativa do cabeçalho
+            const session = localStorage.getItem('flashfoods:user');
+            if (session) {
+                const loggedUser = JSON.parse(session);
+                const novaSessao = {
+                    ...loggedUser,
+                    name: userData.name
+                };
+                localStorage.setItem('flashfoods:user', JSON.stringify(novaSessao));
+            }
 
-        localStorage.setItem("flashfoods:users_db", JSON.stringify(listaAtualizada));
-
-        // Atualiza também a sessão ativa do cabeçalho
-        const session = localStorage.getItem('flashfoods:user');
-        if (session) {
-            const loggedUser = JSON.parse(session);
-            const novaSessao = {
-                ...loggedUser,
-                email: userData.email,
-                name: userData.name
-            };
-            localStorage.setItem('flashfoods:user', JSON.stringify(novaSessao));
+            window.dispatchEvent(new Event("perfilAtualizado"));
+            alert('Dados do perfil salvos com sucesso na nuvem! ✨');
+        } catch (error) {
+            console.error("Erro ao salvar perfil:", error);
+            alert('Erro ao salvar alterações do perfil.');
         }
-
-        window.dispatchEvent(new Event("perfilAtualizado"));
-        alert('Dados do perfil salvos com sucesso! ✨');
     };
+
 
     return {
         userData,

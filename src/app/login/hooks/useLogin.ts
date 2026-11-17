@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebase";
 
 const initialState = {
     email: "",
@@ -17,7 +20,7 @@ export default function useLogin() {
         setCredentials({ ...credentials, [name]: value });
     };
 
-    const handleLogin = (event: React.SubmitEvent<HTMLFormElement>) => {
+    const handleLogin = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (document.activeElement instanceof HTMLElement) {
@@ -29,36 +32,44 @@ export default function useLogin() {
             return;
         }
 
-        // 📦 1. Busca a lista de usuários cadastrados no navegador
-        const bancoLocal = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios = bancoLocal ? JSON.parse(bancoLocal) : [];
+        try {
+            const emailLimpo = credentials.email.toLowerCase().trim();
 
-        // 🔍 2. Procura o usuário pelo e-mail
-        const emailLimpo = credentials.email.toLowerCase().trim();
-        const usuario = listaUsuarios.find((u: any) => u.email.toLowerCase() === emailLimpo);
+            // 1. Valida e-mail e senha no Firebase Authentication
+            const userCredential = await signInWithEmailAndPassword(auth, emailLimpo, credentials.password);
+            const uid = userCredential.user.uid;
 
-        if (!usuario) {
-            alert("Usuário não encontrado! Crie uma conta primeiro.");
-            return;
-        }
+            // 2. Busca os dados do perfil (nome, tipo, restauranteId) no Firestore
+            const userDoc = await getDoc(doc(db, "users", uid));
 
-        // 🔑 3. Valida a senha e salva a sessão ativa
-        if (usuario.password === credentials.password) {
-            alert("Login realizado com sucesso!");
+            if (!userDoc.exists()) {
+                alert("Dados do perfil não encontrados no banco!");
+                return;
+            }
 
+            const usuario = userDoc.data();
+
+            // 3. Mantém a sessão ativa no localStorage para o Header e rotas funcionarem sem alterações
             localStorage.setItem("flashfoods:user", JSON.stringify({
-                id: usuario.id,
+                id: uid,
                 name: usuario.name,
                 email: usuario.email,
-                tipo: usuario.tipo || 'cliente',
-                restauranteId: usuario.restauranteId
+                tipo: usuario.tipo || "cliente",
+                restauranteId: usuario.restauranteId || ""
             }));
 
+            alert("Login realizado com sucesso! 🚀");
             setCredentials(initialState);
             window.dispatchEvent(new Event("perfilAtualizado"));
             router.push("/", { scroll: true });
-        } else {
-            alert("Senha incorreta!");
+
+        } catch (error: any) {
+            console.error("Erro no login:", error);
+            if (error.code === "auth/invalid-credential" || error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+                alert("E-mail ou senha incorretos! ❌");
+            } else {
+                alert("Erro ao conectar com o servidor de autenticação.");
+            }
         }
     };
 

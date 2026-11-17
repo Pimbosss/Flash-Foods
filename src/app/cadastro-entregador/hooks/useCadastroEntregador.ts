@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/services/firebase";
 import Usuario from '@/core/Usuarios';
 
 const initialState: Usuario = {
@@ -25,11 +28,16 @@ export default function useCadastroEntregador() {
         setEntregador(prev => ({ ...prev, [name]: value }));
     };
 
-    const save = (e: React.SubmitEvent<HTMLFormElement>) => {
+    const save = async (e: React.SubmitEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         if (!entregador.email || !entregador.name || !entregador.password || !entregador.cnh) {
             alert("Por favor, preencha todos os campos obrigatórios! 📝");
+            return;
+        }
+
+        if (entregador.password.length < 6) {
+            alert("A senha deve ter pelo menos 6 caracteres! 🔐");
             return;
         }
 
@@ -38,31 +46,37 @@ export default function useCadastroEntregador() {
             return;
         }
 
-        const bancoLocal = localStorage.getItem("flashfoods:users_db");
-        const listaUsuarios: Usuario[] = bancoLocal ? JSON.parse(bancoLocal) : [];
+        try {
+            const emailLimpo = entregador.email.toLowerCase().trim();
 
-        const emailLimpo = entregador.email.toLowerCase().trim();
-        const emailExiste = listaUsuarios.some(u => u.email.toLowerCase() === emailLimpo);
+            // 1. Cria o usuário no Firebase Authentication
+            const userCredential = await createUserWithEmailAndPassword(auth, emailLimpo, entregador.password);
+            const uid = userCredential.user.uid;
 
-        if (emailExiste) {
-            alert("Este e-mail já está cadastrado no sistema! Por favor, use outro endereço. ⚠️");
-            return;
+            // 2. Salva os dados profissionais no Firestore (sem a senha)
+            await setDoc(doc(db, "users", uid), {
+                id: uid,
+                name: entregador.name,
+                email: emailLimpo,
+                phone: entregador.phone,
+                cpf: entregador.cpf,
+                cnh: entregador.cnh,
+                placaVeiculo: entregador.placaVeiculo,
+                tipo: "entregador"
+            });
+
+            alert("Cadastro de entregador realizado com sucesso na nuvem! 🎉🏍️");
+            setEntregador({ ...initialState });
+            router.push("/login");
+
+        } catch (error: any) {
+            console.error("Erro ao cadastrar entregador:", error);
+            if (error.code === "auth/email-already-in-use") {
+                alert("Este e-mail já está cadastrado no sistema! ⚠️");
+            } else {
+                alert("Erro ao conectar com o Firebase ao tentar salvar.");
+            }
         }
-
-        const { confirmPassword, ...dadosSemConfirmacao } = entregador;
-        const novoEntregador: Usuario = {
-            ...dadosSemConfirmacao,
-            id: String(Date.now()),
-            email: emailLimpo,
-            tipo: "entregador"
-        };
-
-        listaUsuarios.push(novoEntregador);
-        localStorage.setItem("flashfoods:users_db", JSON.stringify(listaUsuarios));
-
-        alert("Cadastro de entregador realizado com sucesso! Boas corridas. 🎉🏍️");
-        setEntregador({ ...initialState });
-        router.push("/login");
     };
 
     return { entregador, updatedField, save, router };
