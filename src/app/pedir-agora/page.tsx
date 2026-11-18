@@ -12,11 +12,14 @@ export default function PedirAgora() {
         setCategoria,
         busca,
         setBusca,
-        restaurantesFiltrados,
+        enderecoEntrega,
+        setEnderecoEntrega,
+        salvarEnderecoEntrega,
         restauranteSelecionado,
         setRestauranteSelecionado,
+        restaurantesFiltrados,
         pratosDoCardapio,
-        adicionarAoCarrinho,
+        adicionarAoCarrinho
     } = usePedirAgora();
 
 
@@ -26,8 +29,16 @@ export default function PedirAgora() {
             {/* 📍 SEÇÃO ENDEREÇO */}
             <div className="endereço">
                 <FaLocationDot className="icone-localizacao" />
-                <input type="text" id="endereço" placeholder="Digite seu endereço de entrega..." />
-                <button type="submit">Adicionar</button>
+                <input
+                    type="text"
+                    id="endereço"
+                    placeholder="Digite seu endereço de entrega..."
+                    value={enderecoEntrega}
+                    onChange={(e) => setEnderecoEntrega(e.target.value)}
+                />
+                <button type="button" onClick={salvarEnderecoEntrega}>
+                    Adicionar
+                </button>
             </div>
 
             {/* 🔍 SEÇÃO BUSCA E FILTROS */}
@@ -117,7 +128,7 @@ export default function PedirAgora() {
                                     </div>
                                     <div className="rodape-prato">
                                         <span className="preco-prato">
-                                            R\$ {isNaN(precoNumerico) ? "0,00" : precoNumerico.toFixed(2).replace(".", ",")}
+                                            R$ {isNaN(precoNumerico) ? "0,00" : precoNumerico.toFixed(2).replace(".", ",")}
                                         </span>
                                         <button
                                             className="btn-adicionar-sacola"
