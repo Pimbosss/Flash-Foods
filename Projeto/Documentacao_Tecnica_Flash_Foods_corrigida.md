@@ -1,6 +1,6 @@
 # 📘 Documentação Técnica Completa — Flash Foods
 
-Este documento descreve a arquitetura, o fluxo de dados, os arquivos principais e o funcionamento interno do sistema **Flash Foods**. Ele serve tanto como **material de apoio para a apresentação acadêmica (02/12)** quanto como **guia de integração para novos integrantes da equipe**.
+Este documento descreve a arquitetura, o fluxo de dados, os arquivos principais e o funcionamento interno do sistema **Flash Foods**. Ele serve tanto como **material de apoio** quanto como **guia para integrantes da equipe**.
 
 ---
 
