@@ -48,11 +48,21 @@ export default function useAreaEFunctions() {
 
     const diferencaOntem = ganhosHoje - ganhosOntem;
 
-    // 📥 Busca os pedidos diretamente da coleção "pedidos" no Firestore
+    // 📥 Busca os pedidos e cruza com os endereços reais dos restaurantes no Firestore
     const carregarCorridasDisponiveis = async () => {
         try {
-            const querySnapshot = await getDocs(collection(db, "pedidos"));
-            const listaGeral = querySnapshot.docs.map(documento => ({
+            const [pedidosSnap, restaurantesSnap] = await Promise.all([
+                getDocs(collection(db, "pedidos")),
+                getDocs(collection(db, "restaurantes"))
+            ]);
+
+            // Cria um mapa rápido { idDaLoja: dadosDaLoja } para achar o endereço real
+            const mapaRestaurantes: Record<string, any> = {};
+            restaurantesSnap.docs.forEach(docLoja => {
+                mapaRestaurantes[docLoja.id] = docLoja.data();
+            });
+
+            const listaGeral = pedidosSnap.docs.map(documento => ({
                 id: documento.id,
                 ...documento.data()
             }));
@@ -65,19 +75,21 @@ export default function useAreaEFunctions() {
                 const ganhoCorrida = 6.00 + (kmCalculado * 3.00);
                 const valorDinamic = `R$ ${ganhoCorrida.toFixed(2).replace(".", ",")}`;
 
+                // Busca a loja real pelo restauranteId do pedido
+                const lojaReal = p.restauranteId ? mapaRestaurantes[p.restauranteId] : null;
+
                 return {
                     ...p,
                     status: p.status,
-                    restaurante: p.restaurante || (p.itens?.[0]?.nome ? `Restaurante ${p.itens[0].nome.split(' ')[0]}` : "Flash Foods Store"),
-                    endereco: p.endereco || "Rua das Flores, 123 (Simulado)",
-                    enderecoRestaurante: p.enderecoRestaurante || "Av. Paulista, 900 (Simulado)",
+                    restaurante: lojaReal?.nome || p.restaurante || "Flash Foods Store",
+                    endereco: p.endereco || "Endereço do cliente não informado",
+                    enderecoRestaurante: lojaReal?.endereco || p.enderecoRestaurante || "Endereço da loja não informado",
                     distancia: p.distancia || `${kmCalculado.toFixed(1).replace(".", ",")} km`,
                     tempo: p.tempo || `${Math.floor(kmCalculado * 5)} min`,
                     valor: p.valor || valorDinamic
                 };
             });
 
-            // Filtra apenas pedidos que a cozinha já aceitou ("preparando") ou que estão "a caminho"
             const corridasFiltradas = pedidosAdaptados.filter((p: any) =>
                 p.status === "preparando" || p.status === "a caminho"
             );
@@ -99,14 +111,14 @@ export default function useAreaEFunctions() {
             }
 
             const usuarioLogado = JSON.parse(sessao);
-
             if (usuarioLogado.tipo !== "entregador") {
                 alert("⚠️ Acesso Negado! Esta área é exclusiva para entregadores parceiros cadastrados.");
                 window.location.href = "/";
-                return;
             }
         }
+    }, [])
 
+    useEffect(() => {
         carregarCorridasDisponiveis();
     }, [entregaAtual]);
 

@@ -38,7 +38,7 @@ export default function useCarrinhoPage() {
             total: valorTotal + 5.00,
             status: "pendente", 
             data: new Date().toLocaleString("pt-BR"),
-            endereco: "Rua das Flores, 123 (Simulado)", 
+            endereco: usuarioLogado.endereco || "Endereço não informado no perfil", 
             restauranteId: primeiroItem?.restauranteId || "rest_default",
             restaurante: primeiroItem?.nomeRestaurante || primeiroItem?.restaurante || "Restaurante Parceiro"
         };

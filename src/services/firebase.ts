@@ -11,9 +11,7 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Evita que o Next.js inicialize o Firebase duas vezes ao recarregar a página
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Exporta as duas ferramentas que vamos usar nos Hooks: Autenticação e Banco de Dados
 export const auth = getAuth(app);
 export const db = getFirestore(app);

@@ -25,7 +25,7 @@ export default function Cadastro() {
                     <input
                         type="email"
                         id="email"
-                        name="email" // IMPORTANTE: igual à chave do objeto
+                        name="email" 
                         value={user.email}
                         onChange={updatedField}
                         placeholder="Digite seu email"
@@ -34,7 +34,7 @@ export default function Cadastro() {
                     <input
                         type="name"
                         id="name"
-                        name="name" // IMPORTANTE: igual à chave do objeto
+                        name="name" 
                         value={user.name}
                         onChange={updatedField}
                         placeholder="Digite seu Nomel"
@@ -42,7 +42,7 @@ export default function Cadastro() {
 
                     <label htmlFor="cpf">CPF</label>
                     <input
-                        type="text" // Corrigido de email para text
+                        type="text" 
                         id="cpf"
                         name="cpf"
                         value={user.cpf}
@@ -52,12 +52,22 @@ export default function Cadastro() {
 
                     <label htmlFor="phone">Telefone</label>
                     <input
-                        type="tel" // Mudado de email para tel (semântica correta)
+                        type="tel" 
                         id="phone"
                         name="phone"
                         value={user.phone}
                         onChange={updatedField}
                         placeholder="Digite seu Telefone"
+                    />
+
+                    <label htmlFor="endereco">Endereço</label>
+                    <input
+                        type="endereco" 
+                        id="endereco"
+                        name="endereco"
+                        value={user.endereco || ""}
+                        onChange={updatedField}
+                        placeholder="Rua, Numero e Bairro"
                     />
 
                     <label htmlFor="password">Senha</label>

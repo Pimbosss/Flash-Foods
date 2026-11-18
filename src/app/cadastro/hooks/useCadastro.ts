@@ -14,7 +14,8 @@ const initialState: Usuario = {
     phone: "",
     password: "",
     confirmPassword: "",
-    tipo: "cliente"
+    tipo: "cliente",
+    endereco: ""
 };
 
 export default function useCadastro() {
@@ -29,7 +30,7 @@ export default function useCadastro() {
     const save = async (event: React.SubmitEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!user.email || !user.cpf || !user.phone || !user.password || !user.confirmPassword || !user.name) {
+        if (!user.email || !user.cpf || !user.phone || !user.password || !user.confirmPassword || !user.name || !user.endereco) {
             alert("Todos os campos são obrigatórios! 📝");
             return;
         }
@@ -58,7 +59,8 @@ export default function useCadastro() {
                 name: user.name,
                 cpf: user.cpf,
                 phone: user.phone,
-                tipo: "cliente"
+                tipo: "cliente",
+                endereco: user.endereco
             });
 
             alert("Cadastro realizado com sucesso na nuvem! 🎉");

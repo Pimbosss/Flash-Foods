@@ -56,7 +56,8 @@ export default function usePerfil() {
             await updateDoc(userRef, {
                 name: userData.name,
                 phone: userData.phone || "",
-                cpf: userData.cpf || ""
+                cpf: userData.cpf || "",
+                endereco: userData.endereco || ""
             });
 
             // Atualiza a sessão ativa do cabeçalho

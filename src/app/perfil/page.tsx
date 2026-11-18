@@ -75,6 +75,18 @@ export default function Perfil() {
                             placeholder="(00) 00000-0000"
                         />
                     </div>
+
+                    <div className={styles.infoField}>
+                        <span className={styles.label}>Endereço</span>
+                        <input 
+                            type="text" 
+                            name="endereco" 
+                            value={userData.endereco || ""} 
+                            onChange={updatedField} 
+                            placeholder=""
+                        />
+                    </div>
+
                 </div>
 
                 <HistoricoPedido/>

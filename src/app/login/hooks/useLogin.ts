@@ -55,6 +55,7 @@ export default function useLogin() {
                 name: usuario.name,
                 email: usuario.email,
                 tipo: usuario.tipo || "cliente",
+                endereco: usuario.endereco || "",
                 restauranteId: usuario.restauranteId || ""
             }));
 
@@ -64,10 +65,10 @@ export default function useLogin() {
             router.push("/", { scroll: true });
 
         } catch (error: any) {
-            console.error("Erro no login:", error);
             if (error.code === "auth/invalid-credential" || error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
                 alert("E-mail ou senha incorretos! ❌");
             } else {
+                console.error("Erro inesperado no login:", error);
                 alert("Erro ao conectar com o servidor de autenticação.");
             }
         }
