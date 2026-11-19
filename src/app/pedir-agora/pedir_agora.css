@@ -584,4 +584,67 @@
     .card-prato {
         padding: 16px;
     }
+    .Pedir-page .cards-pratos,
+    .cards-pratos {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        gap: 14px;
+        padding: 4px 4px 16px 4px;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Esconde a barra de rolagem no Firefox */
+    }
+
+    .cards-pratos::-webkit-scrollbar {
+        display: none; /* Esconde a barra de rolagem no Chrome/Safari */
+    }
+
+    /* 2. Define largura fixa agradável (75% da tela) e altura compacta para cada card */
+    .card-prato {
+        flex: 0 0 75% !important;
+        max-width: 280px !important;
+        min-height: auto !important;
+        height: auto !important;
+        box-sizing: border-box;
+        padding: 16px;
+        scroll-snap-align: start;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .card-prato h3 {
+        margin: 6px 0 2px;
+        font-size: 16px;
+    }
+
+    .card-prato p {
+        margin-bottom: 8px;
+        font-size: 13px;
+        line-height: 18px;
+    }
+
+    /* 3. Mantém preço e botão alinhados na base sem cortar */
+    .rodape-prato {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px dashed #f1f5f9;
+    }
+
+    .preco-prato {
+        font-size: 17px;
+        white-space: nowrap;
+    }
+
+    .btn-adicionar-sacola {
+        padding: 7px 14px;
+        font-size: 13px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
 }

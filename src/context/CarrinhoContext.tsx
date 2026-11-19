@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useState, ReactNode } from "react";
+import {  createContext, useContext, useState, useEffect, ReactNode } from "react";
 export interface Produto {
     id: string;
     nome: string;
@@ -32,6 +32,15 @@ interface CarrinhoProviderProps {
 
 export function CarrinhoProvider({ children }: CarrinhoProviderProps) {
     const [carrinho, setCarrinho] = useState<Produto[]>([]);
+    
+    useEffect(() => {
+    const limparAoMudarPerfil = () => {
+        setCarrinho([]);
+    };
+
+    window.addEventListener("perfilAtualizado", limparAoMudarPerfil);
+    return () => window.removeEventListener("perfilAtualizado", limparAoMudarPerfil);
+}, []);
 
     // Adicionar lanche ao carrinho
     function adicionarAoCarrinho(produto: Omit<Produto, 'quantidade'>) {
